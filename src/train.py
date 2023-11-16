@@ -5,7 +5,7 @@ import argparse
 
 from datasets import get_images, get_dataset, get_data_loaders
 from engine import train, validate
-from model import UNet3
+from model import UNet3, UNet5
 from config import ALL_CLASSES, LABEL_COLORS_LIST
 from utils import save_model, SaveBestModel, save_plots, SaveBestModelIOU
 from torch.optim.lr_scheduler import MultiStepLR
@@ -43,6 +43,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '--scheduler',
+    default=True,
     action='store_true',
 )
 args = parser.parse_args()
@@ -56,7 +57,7 @@ if __name__ == '__main__':
     os.makedirs(out_dir_valid_preds, exist_ok=True)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    model = UNet3(num_classes=len(ALL_CLASSES)).to(device)
+    model = UNet5(num_classes=len(ALL_CLASSES)).to(device)
     print(model)
     # Total parameters and trainable parameters.
     total_params = sum(p.numel() for p in model.parameters())
@@ -94,7 +95,7 @@ if __name__ == '__main__':
     save_best_iou = SaveBestModelIOU()
     # LR Scheduler.
     scheduler = MultiStepLR(
-        optimizer, milestones=[60], gamma=0.1, verbose=True
+        optimizer, milestones=[25], gamma=0.1, verbose=True
     )
 
     EPOCHS = args.epochs
