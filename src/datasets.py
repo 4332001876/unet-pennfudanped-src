@@ -3,10 +3,12 @@ import numpy as np
 import torch
 import cv2
 from PIL import Image
+import torchvision.transforms.functional as F
 
 from utils import get_label_mask, set_class_values
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
+from augmentation import AutoAugment
 
 def get_images(root_path):
     train_images = glob.glob(f"{root_path}/train_images/*")
@@ -41,6 +43,13 @@ def train_transforms(img_size):
         transforms.ToTensor()
     ])
     return train_image_transform
+    """res = []
+    res.append(transforms.RandomHorizontalFlip(p=0.5))
+    res.extend([transforms.Pad(2, padding_mode='constant'),
+                    transforms.RandomCrop([32,32])])
+    res.append(transforms.RandomApply([AutoAugment()], p=0.6))
+    #res.append(transforms.ToTensor())
+    return transforms.Compose(res)"""
 
 def valid_transforms(img_size):
     """
@@ -84,25 +93,19 @@ class SegmentationDataset(Dataset):
         # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         # image = image / 255.0
         mask = cv2.imread(self.mask_paths[index], -1)
-
         # Make all instances of person 255 pixel value and background 0.
-
-
-        
         mask = Image.fromarray(mask)
 
-        image = np.array(self.tfms(image))
-        mask  = np.array(self.tfms(mask))
+        # np.shape(image)=(414, 455, 3) np.shape(mask)=(414, 455)
+        image, mask = self.transforming_data(image, mask)
 
         im = mask > 0
         mask[im] = 1
         mask[np.logical_not(im)] = 0
         mask = mask[0,:,:]
     
-      
         # Get colored label mask.
         # mask = get_label_mask(mask, self.class_values, self.label_colors_list)
-       
         # image = np.transpose(image, (2, 0, 1))
         
         image = torch.tensor(image, dtype=torch.float)
@@ -110,6 +113,18 @@ class SegmentationDataset(Dataset):
 
         # print("######################################3", image.shape, mask.shape)
 
+        return image, mask
+
+    def transforming_data(self, image, mask):
+        image = self.tfms(image)
+        mask = self.tfms(mask)
+        if torch.rand(1) < 0.5:
+            image = F.hflip(image)
+            mask = F.hflip(mask)
+        #image = F.pad(image, 2)
+        #mask = F.pad(image, 2)
+        image = np.array(image)
+        mask = np.array(mask)
         return image, mask
 
 def get_dataset(

@@ -213,7 +213,7 @@ def draw_segmentation_map(outputs):
     green_map = np.zeros_like(labels).astype(np.uint8)
     blue_map = np.zeros_like(labels).astype(np.uint8)
     
-    for label_num in range(0, len(viz_map)):
+    for label_num in range(0, len(viz_map)): #按不同颜色填充不同类别的区域
         index = labels == label_num
         red_map[index] = np.array(viz_map)[label_num, 0]
         green_map[index] = np.array(viz_map)[label_num, 1]

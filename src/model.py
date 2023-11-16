@@ -54,15 +54,15 @@ class UNet3(nn.Module):
 
     def forward(self, x):
         down_1 = self.down_convolution_1(x)
-        down_2 = self.max_pool2d(down_1)
+        down_2 = self.max_pool2d(down_1) # 1/2
         down_3 = self.down_convolution_2(down_2)
-        down_4 = self.max_pool2d(down_3)
+        down_4 = self.max_pool2d(down_3) # 1/4
         down_5 = self.down_convolution_3(down_4)
         
-        up_3 = self.up_transpose_3(down_5)
+        up_3 = self.up_transpose_3(down_5) # 1/2
         x = self.up_convolution_3(torch.cat([down_3, up_3], 1))
 
-        up_4 = self.up_transpose_4(x)
+        up_4 = self.up_transpose_4(x) # 1/1
         x = self.up_convolution_4(torch.cat([down_1, up_4], 1))
 
         out = self.out(x)
