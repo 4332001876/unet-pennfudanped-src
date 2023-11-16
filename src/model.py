@@ -2,6 +2,35 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+def soft_dice_loss(y_pred, y_true, epsilon=1e-6): 
+    ''' 
+    Soft dice loss calculation for arbitrary batch size, number of classes, and number of spatial dimensions.
+    Assumes the `channels_last` format.
+  
+    # Arguments
+        y_true: b x X x Y( x Z...) Need to transform to b x c x X x Y( x Z...) One hot encoding of ground truth
+        y_pred: b x c x X x Y( x Z...) Network output, must sum to 1 over c channel (such as after softmax) 
+        epsilon: Used for numerical stability to avoid divide by zero errors
+    
+    # References
+        V-Net: Fully Convolutional Neural Networks for Volumetric Medical Image Segmentation 
+        https://arxiv.org/abs/1606.04797
+        More details on Dice loss formulation 
+        https://mediatum.ub.tum.de/doc/1395260/1395260.pdf (page 72)
+        
+        Adapted from https://github.com/Lasagne/Recipes/issues/99#issuecomment-347775022
+    '''
+    
+    # skip the batch and class axis for calculating Dice score
+    y_true = torch.unsqueeze(y_true, dim=1)
+    y_pred = F.softmax(y_pred, dim=1)
+    y_pred = y_pred[:,1:,:,:]
+    axes = tuple(range(2, len(y_pred.shape))) 
+    numerator = 2. * torch.sum(y_pred * y_true, axes)
+    denominator = torch.sum(torch.square(y_pred) + torch.square(y_true), axes)
+    
+    return 1 - torch.mean((numerator + 1.0) / (denominator + epsilon + 1.0)) # average over classes and batch
+
 class SiLU(nn.Module):
     """export-friendly version of nn.SiLU()"""
 
