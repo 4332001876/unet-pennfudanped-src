@@ -4,6 +4,7 @@ import torch
 import cv2
 from PIL import Image
 import torchvision.transforms.functional as F
+from tqdm import tqdm
 
 from utils import get_label_mask, set_class_values
 from torch.utils.data import Dataset, DataLoader
@@ -83,39 +84,57 @@ class SegmentationDataset(Dataset):
         self.class_values = set_class_values(
             self.all_classes, self.classes_to_train
         )
+        self.load_dataset()
 
     def __len__(self):
         return len(self.image_paths)
 
     def __getitem__(self, index):
-        image = cv2.imread(self.image_paths[index], cv2.IMREAD_COLOR)
-        image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-        # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        # image = image / 255.0
-        mask = cv2.imread(self.mask_paths[index], -1)
-        # Make all instances of person 255 pixel value and background 0.
-        mask = Image.fromarray(mask)
-
-        # np.shape(image)=(414, 455, 3) np.shape(mask)=(414, 455)
-        image, mask = self.transforming_data(image, mask)
-
-        im = mask > 0
-        mask[im] = 1
-        mask[np.logical_not(im)] = 0
-        mask = mask[0,:,:]
+        return self.image[index], self.mask[index]
     
-        # Get colored label mask.
-        # mask = get_label_mask(mask, self.class_values, self.label_colors_list)
-        # image = np.transpose(image, (2, 0, 1))
-        
-        image = torch.tensor(image, dtype=torch.float)
-        mask = torch.tensor(mask, dtype=torch.long) 
+    def load_dataset(self):
+        self.image=[]
+        self.mask=[]
+        with tqdm(total=len(self.image_paths)) as pbar:
+            pbar.set_description('Preparing Dataset:')
+            for index in range(len(self.image_paths)):
+                image = cv2.imread(self.image_paths[index], cv2.IMREAD_COLOR)
+                gray=cv2.cvtColor(image,cv2.COLOR_RGB2GRAY)
+                canny_gray=cv2.Canny(gray, 50, 99)
 
-        # print("######################################3", image.shape, mask.shape)
+                image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+                # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                # image = image / 255.0
+                mask = cv2.imread(self.mask_paths[index], -1)
+                # Make all instances of person 255 pixel value and background 0.
+                mask = Image.fromarray(mask)
 
-        return image, mask
+                # np.shape(image)=(414, 455, 3) np.shape(mask)=(414, 455)
+                image, mask = self.transforming_data(image, canny_gray, mask)
 
-    def transforming_data(self, image, mask):
+                im = mask > 0
+                mask[im] = 1
+                mask[np.logical_not(im)] = 0
+                mask = mask[0,:,:]
+            
+                # Get colored label mask.
+                # mask = get_label_mask(mask, self.class_values, self.label_colors_list)
+                # image = np.transpose(image, (2, 0, 1))
+                
+                image = torch.tensor(image, dtype=torch.float)
+                mask = torch.tensor(mask, dtype=torch.long) 
+                # print("######################################3", image.shape, mask.shape)
+                self.image.append(image)
+                self.mask.append(mask)
+                pbar.update(1)
+
+
+    def transforming_data(self, image, canny_gray, mask):
+        if canny_gray is not None:
+            image = np.array(image)
+            image = np.concatenate((image, np.expand_dims(canny_gray, axis=2)), axis=2)
+            image = Image.fromarray(image)
+
         image = self.tfms(image)
         mask = self.tfms(mask)
         if torch.rand(1) < 0.5:
